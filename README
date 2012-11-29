@@ -1,0 +1,79 @@
+-----------------------------------------------------------------------------------------------------------------
+---                         PowerShell 2.0 Script for backing up Domino data to Amazon S3 Storage             ---
+-----------------------------------------------------------------------------------------------------------------
+                                                                                                                 
+ This script does the following:                                                                                 
+ - stops Domino server                                                                                           
+ - copies files from Domino data or program directory to a temporary location                                    
+ - archives files using 7-Zip                                                                                    
+ - uploads the archive to an S3 Storage bucket                                                                   
+ - starts Domino server                                                                                          
+                                                                                                                 
+ The prerequisites:                                                                                              
+ - 7-Zip:        Used to archive and compress backup files. The script uses 7z algorithm and strongest           
+                 compression. Download and install. Change the variable $7zipfilepath if you did not install     
+                 in default location. http://www.7-zip.org/                                                      
+ - S3Sync:       Used to sync local folder with Amazon S3 bucket. Download and copy to appropriate location      
+                 (no install necessary). Script assumes that S3Sync.exe is located in                            
+                 C:\Program Files (x86)\S3Sync\. Change the variable $s3syncfilepath to reflect the actual       
+                 location. http://sprightlysoft.com/S3Sync/                                                      
+                                                                                                                 
+ Mandatory variables:                                                                                            
+ - $dominoserver: name of the Domino server service. Open Computer > Manage > Services And Applications >        
+                  Services and look for Lotus Domino server. Copy value from the Name column,                    
+                  e.g. Lotus Domino Server (DDominoData).                                                        
+ - $datafolder:   Location of the Domino data folder, e.g. D:\Domino\Data\                                       
+ - $datafiles:    Domino files to backup. Enter path relative to datafolder. For example, names.nsf or           
+                  mail\jsmith.nsf. Separate entries with comma. Do not remove @ sign or parantheses.             
+ - $workfolder:   path of the folder where files will be copied to, archived and uploaded. The script will       
+                  automatically generate \working\ and \logs\ subfolders. E.g. D:\backups\                       
+ - $archivename:  name of the 7-Zip archive that is created, without extension. The script will automatically    
+                  add today's date and time and 7z extension. E.g. data_backup                                   
+ - $s3accesskey:  Amazon S3 Storage Access Key                                                                   
+ - $s3secretkey:  Amazon S3 Storage Secret Key                                                                   
+ - $s3bucketname: name of the Amazon S3 bucket where you wish to upload the backup.                              
+ - $s3foldername: (optional) name of a folder in the bucket. Must end with trailing slash! E.g. domino_backups\  
+                                                                                                                 
+ NOTE: Enclose file names and paths in quotations (e.g. "mail\jsmith.nsf"). Although not necessary if the path   
+ does not contain spaces, it won't hurt. Also, all path locations MUST end with backslash (\).                   
+                                                                                                                 
+ Logging                                                                                                         
+ -------                                                                                                         
+ The script will create log file $workfolder\logs\backup_log.txt. The subsequent logs are appended to this file. 
+ Relatively small amount of text is logged, so you don't need to worry about the file size.                      
+ The console shows same information that is logged in the file, with addition of runtime information from 7-Zip  
+ and S3Sync.                                                                                                     
+                                                                                                                 
+ Execution Flow                                                                                                  
+ --------------                                                                                                  
+ The script first initializes some internal variables.                                                           
+                                                                                                                 
+ Then, it initiates shut-down of the Domino server and waits for its completion. This is performed using          
+ standard Windows services commands. If the Domino server fails to shut-down, the script will abort.             
+                                                                                                                 
+ When the server shuths down, the script copies files from data directory to backup directory.                   
+                                                                                                                 
+ As soon as the file copy operation is finished, the Domino server is started again. Should the server fail to   
+ start, the error is logged, but the execution is continued.                                                     
+                                                                                                                 
+ The next in line is 7-Zip which zips all files in the backup directory in a single file. The file name consists 
+ of an arbitrary part and today's date and time. Which means that we are not using the S3 versioning support and 
+ each backup is a separate object in the S3 bucket.                                                              
+                                                                                                                 
+ After the zip file has been made, S3Sync is called. S3Sync will upload to all *.7z files in the root of the      
+ backup folder to the defined Amazon S3 bucket and folder.                                                       
+                                                                                                                 
+ If upload fails, the archive file is left in the backup folder and will be automatically uploaded next time the 
+ script runs.                                                                                                    
+                                                                                                                 
+-----------------------------------------------------------------------------------------------------------------
+ Author: Sasa Brkic <sasa.brkic@cs-computing.com>                                                                
+ Date: 2012-11-27                                                                                                
+ Version: 1.1
+ 
+-----------------------------------------------------------------------------------------------------------------
+ Revisions:                                                                                                      
+ v1.1 - The script checks and creates working and log folders if they do not already exist.                      
+ v1.0 - Initial Release  
+ 
+-----------------------------------------------------------------------------------------------------------------
